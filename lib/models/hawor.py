@@ -63,10 +63,10 @@ class HAWOR(pl.LightningModule):
             print('WARNING: init backbone from sratch !!!')
 
         # Space-time memory
-        if cfg.MODEL.ST_MODULE: 
+        if cfg.MODEL.ST_MODULE:
             hdim = cfg.MODEL.ST_HDIM
             nlayer = cfg.MODEL.ST_NLAYER
-            self.st_module = temporal_attention(in_dim=1280+3, 
+            self.st_module = temporal_attention(in_dim=1280+3,
                                                 out_dim=1280,
                                                 hdim=hdim,
                                                 nlayer=nlayer,
@@ -80,7 +80,7 @@ class HAWOR(pl.LightningModule):
             hdim = cfg.MODEL.MOTION_HDIM
             nlayer = cfg.MODEL.MOTION_NLAYER
 
-            self.motion_module = temporal_attention(in_dim=self.pose_num * self.pose_dim + self.box_info_dim, 
+            self.motion_module = temporal_attention(in_dim=self.pose_num * self.pose_dim + self.box_info_dim,
                                                     out_dim=self.pose_num * self.pose_dim,
                                                     hdim=hdim,
                                                     nlayer=nlayer,
@@ -93,9 +93,9 @@ class HAWOR(pl.LightningModule):
         # self.mano_head = build_mano_head(cfg)
         self.mano_head = MANOTransformerDecoderHead(cfg)
 
-        
+
         # default open torch compile
-        if cfg.MODEL.BACKBONE.get('TORCH_COMPILE', 0): 
+        if cfg.MODEL.BACKBONE.get('TORCH_COMPILE', 0):
             log.info("Model will use torch.compile")
             self.backbone = torch.compile(self.backbone)
             self.mano_head = torch.compile(self.mano_head)
@@ -194,13 +194,13 @@ class HAWOR(pl.LightningModule):
         out = {}
         if 'do_flip' in batch:
             pred_cam[..., 1] *= -1
-            center[..., 0] = img_center[..., 0]*2 - center[..., 0] - 1 
+            center[..., 0] = img_center[..., 0]*2 - center[..., 0] - 1
         out['pred_cam'] = pred_cam
         out['pred_pose'] = pred_pose
         out['pred_shape'] = pred_shape
         out['pred_rotmat'] = rot6d_to_rotmat(out['pred_pose']).reshape(-1, self.pose_num, 3, 3)
         out['pred_rotmat_0'] = pred_rotmat_0
-        
+
         s_out = self.mano.query(out)
         j3d = s_out.joints
         j2d = self.project(j3d, out['pred_cam'], center, scale, img_focal, img_center)
@@ -222,7 +222,7 @@ class HAWOR(pl.LightningModule):
         # print(output)
         # output['gt_project_j2d'] = self.project(batch['gt_j3d_wo_trans'].clone().flatten(0,1), out['pred_cam'], center, scale, img_focal, img_center)
         # output['gt_project_j2d'] = output['gt_project_j2d'] / self.crop_size - 0.5
-        
+
 
         return output
 
@@ -310,7 +310,7 @@ class HAWOR(pl.LightningModule):
             summary_writer = self.logger.experiment
             for loss_name, val in losses.items():
                 summary_writer.add_scalar(mode +'/' + loss_name, val.detach().item(), step_count)
-        
+
         if render_log:
             gt_keypoints_2d = batch['gt_cam_j2d'].flatten(0,1).clone()
             pred_keypoints_2d = output['pred_keypoints_2d'].clone().detach().reshape(batch_size, -1, 2)
@@ -326,7 +326,7 @@ class HAWOR(pl.LightningModule):
                                                 gt_keypoints_2d[:num_images*skip:skip].cpu().numpy(),
                                                 )
             summary_writer.add_image('%s/predictions' % mode, predictions, step_count)
-    
+
 
     def forward(self, batch: Dict) -> Dict:
         """
@@ -355,7 +355,7 @@ class HAWOR(pl.LightningModule):
         output = self.forward_step(batch, train=True)
         # pred_mano_params = output['pred_mano_params']
         loss = self.compute_loss(batch, output, train=True)
-        
+
         # Error if Nan
         if torch.isnan(loss):
             raise ValueError('Loss is NaN')
@@ -367,7 +367,7 @@ class HAWOR(pl.LightningModule):
             gn = torch.nn.utils.clip_grad_norm_(self.get_parameters(), self.cfg.TRAIN.GRAD_CLIP_VAL, error_if_nonfinite=True)
             self.log('train/grad_norm', gn, on_step=True, on_epoch=True, prog_bar=True, logger=True, batch_size=batch_size)
         optimizer.step()
-        
+
         # if self.global_step > 0 and self.global_step % self.cfg.GENERAL.LOG_STEPS == 0:
         if self.global_step > 0 and self.global_step % 100 == 0:
             self.tensorboard_logging(batch, output, self.global_step, train=True, render_log=self.cfg.TRAIN.get("RENDER_LOG", True))
@@ -377,7 +377,7 @@ class HAWOR(pl.LightningModule):
         return output
 
     def inference(self, imgfiles, boxes, img_focal, img_center, device='cuda', do_flip=False):
-        db = TrackDatasetEval(imgfiles, boxes, img_focal=img_focal, 
+        db = TrackDatasetEval(imgfiles, boxes, img_focal=img_focal,
                         img_center=img_center, normalization=True, dilate=1.2, do_flip=do_flip)
 
         # Results
@@ -420,7 +420,7 @@ class HAWOR(pl.LightningModule):
                 out = {k:v[:len(db) % 16] for k,v in out.items()}
             else:
                 out = {k:v for k,v in out.items()}
-                
+
             pred_cam.append(out['pred_cam'].cpu())
             pred_pose.append(out['pred_pose'].cpu())
             pred_shape.append(out['pred_shape'].cpu())
@@ -435,7 +435,7 @@ class HAWOR(pl.LightningModule):
                 'pred_trans': torch.cat(pred_trans),
                 'img_focal': img_focal,
                 'img_center': img_center}
-        
+
         return results
 
     def validation_step(self, batch: Dict, batch_idx: int, dataloader_idx=0) -> Dict:
@@ -454,7 +454,7 @@ class HAWOR(pl.LightningModule):
         self.tensorboard_logging(batch, output, self.global_step, train=False)
 
         return output
-    
+
     def visualize_tensorboard(self, images, pred_keypoints, gt_project_j2d, gt_keypoints):
         pred_keypoints = 256 * (pred_keypoints + 0.5)
         gt_keypoints = 256 * (gt_keypoints + 0.5)
@@ -496,14 +496,14 @@ class HAWOR(pl.LightningModule):
             return points2d_full, points2d
         else:
             return points2d
-        
+
     def get_trans(self, pred_cam, center, scale, img_focal, img_center):
         b      = scale * 200
         cx, cy = center[:,0], center[:,1]            # center of crop
         s, tx, ty = pred_cam.unbind(-1)
 
         img_cx, img_cy = img_center[:,0], img_center[:,1]  # center of original image
-        
+
         bs = b*s
         tx_full = tx + 2*(cx-img_cx)/bs
         ty_full = ty + 2*(cy-img_cy)/bs
@@ -513,7 +513,7 @@ class HAWOR(pl.LightningModule):
         trans_full = trans_full.unsqueeze(1)
 
         return trans_full
-    
+
     def bbox_est(self, center, scale, img_focal, img_center):
         # Original image center
         img_cx, img_cy = img_center[:,0], img_center[:,1]
@@ -521,7 +521,7 @@ class HAWOR(pl.LightningModule):
         # Implement CLIFF (Li et al.) bbox feature
         cx, cy, b = center[:, 0], center[:, 1], scale * 200
         bbox_info = torch.stack([cx - img_cx, cy - img_cy, b], dim=-1)
-        bbox_info[:, :2] = bbox_info[:, :2] / img_focal.unsqueeze(-1) * 2.8 
-        bbox_info[:, 2] = (bbox_info[:, 2] - 0.24 * img_focal) / (0.06 * img_focal)  
+        bbox_info[:, :2] = bbox_info[:, :2] / img_focal.unsqueeze(-1) * 2.8
+        bbox_info[:, 2] = (bbox_info[:, 2] - 0.24 * img_focal) / (0.06 * img_focal)
 
         return bbox_info

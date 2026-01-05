@@ -14,7 +14,7 @@ from lib.eval_utils.custom_utils import load_slam_cam
 from lib.vis.run_vis2 import run_vis2_on_video, run_vis2_on_video_cam
 
 
-def render_reconstruction(input_video, img_focal): 
+def render_reconstruction(input_video, img_focal):
     args = EasyDict()
     args.video_path = input_video
     args.input_type = 'file'
@@ -22,7 +22,7 @@ def render_reconstruction(input_video, img_focal):
     args.infiller_weight = './weights/hawor/checkpoints/infiller.pt'
     args.vis_mode = 'world'
     args.img_focal = img_focal
-    
+
     start_idx, end_idx, seq_folder, imgfiles = detect_track_video(args)
 
     frame_chunks_all, img_focal = hawor_motion_estimation(args, start_idx, end_idx, seq_folder)
@@ -42,7 +42,7 @@ def render_reconstruction(input_video, img_focal):
     }
     vis_start = 0
     vis_end = pred_trans.shape[1] - 1
-            
+
     # get faces
     faces = get_mano_faces()
     faces_new = np.array([[92, 38, 234],
@@ -91,9 +91,9 @@ def render_reconstruction(input_video, img_focal):
     t_w2c_sla_all = -torch.einsum("bij,bj->bi", R_w2c_sla_all, t_c2w_sla_all)
     left_dict['vertices'] = torch.einsum('ij,btnj->btni', R_x, left_dict['vertices'].cpu())
     right_dict['vertices'] = torch.einsum('ij,btnj->btni', R_x, right_dict['vertices'].cpu())
-    
+
     # Here we use aitviewer(https://github.com/eth-ait/aitviewer) for simple visualization.
-    if args.vis_mode == 'world': 
+    if args.vis_mode == 'world':
         output_pth = os.path.join(seq_folder, f"vis_{vis_start}_{vis_end}")
         if not os.path.exists(output_pth):
             os.makedirs(output_pth)
@@ -109,12 +109,12 @@ def render_reconstruction(input_video, img_focal):
         # run_vis2_on_video_cam(left_dict, right_dict, output_pth, img_focal, image_names, R_w2c=R_w2c_sla_all[vis_start:vis_end], t_w2c=t_w2c_sla_all[vis_start:vis_end])
         raise NotImplementedError
 
-    return vis_video_path  
+    return vis_video_path
 
 # @spaces.GPU()
 def run_wilow_model(image, conf, IoU_threshold=0.5):
     img_cv2 = image[...,::-1]
-    return img_vis.astype(np.float32)/255.0, len(detections), None       
+    return img_vis.astype(np.float32)/255.0, len(detections), None
 
 
 
@@ -122,7 +122,7 @@ header = ('''
 <div class="embed_hidden" style="text-align: center;">
     <h1> <b>HaWoR</b>: World-Space Hand Motion Reconstruction from Egocentric Videos</h1>
     <h3>
-        <a href="" target="_blank" rel="noopener noreferrer">Jinglei Zhang</a><sup>1</sup>,        
+        <a href="" target="_blank" rel="noopener noreferrer">Jinglei Zhang</a><sup>1</sup>,
         <a href="https://jiankangdeng.github.io/" target="_blank" rel="noopener noreferrer">Jiankang Deng</a><sup>2</sup>,
         <br>
         <a href="https://scholar.google.com/citations?user=syoPhv8AAAAJ&hl=en" target="_blank" rel="noopener noreferrer">Chao Ma</a><sup>1</sup>
@@ -134,10 +134,10 @@ header = ('''
     </h3>
 </div>
 <div style="display:flex; gap: 0.3rem; justify-content: center; align-items: center;" align="center">
-<a href='https://arxiv.org/abs/xxxx.xxxxx'><img src='https://img.shields.io/badge/Arxiv-xxxx.xxxxx-A42C25?style=flat&logo=arXiv&logoColor=A42C25'></a> 
-<a href=''><img src='https://img.shields.io/badge/Paper-PDF-yellow?style=flat&logo=arXiv&logoColor=yellow'></a> 
-<a href='https://hawor-project.github.io/'><img src='https://img.shields.io/badge/Project-Page-%23df5b46?style=flat&logo=Google%20chrome&logoColor=%23df5b46'></a> 
-<a href='https://github.com/ThunderVVV/HaWoR'><img src='https://img.shields.io/badge/GitHub-Code-black?style=flat&logo=github&logoColor=white'></a> 
+<a href='https://arxiv.org/abs/xxxx.xxxxx'><img src='https://img.shields.io/badge/Arxiv-xxxx.xxxxx-A42C25?style=flat&logo=arXiv&logoColor=A42C25'></a>
+<a href=''><img src='https://img.shields.io/badge/Paper-PDF-yellow?style=flat&logo=arXiv&logoColor=yellow'></a>
+<a href='https://hawor-project.github.io/'><img src='https://img.shields.io/badge/Project-Page-%23df5b46?style=flat&logo=Google%20chrome&logoColor=%23df5b46'></a>
+<a href='https://github.com/ThunderVVV/HaWoR'><img src='https://img.shields.io/badge/GitHub-Code-black?style=flat&logo=github&logoColor=white'></a>
 ''')
 
 
@@ -152,19 +152,19 @@ with gr.Blocks(title="HaWoR: World-Space Hand Motion Reconstruction from Egocent
             # threshold = gr.Slider(value=0.3, minimum=0.05, maximum=0.95, step=0.05, label='Detection Confidence Threshold')
             #nms = gr.Slider(value=0.5, minimum=0.05, maximum=0.95, step=0.05, label='IoU NMS Threshold')
             submit = gr.Button("Submit", variant="primary")
-        
-        
+
+
         with gr.Column():
             reconstruction = gr.Video(label="Reconstruction",show_download_button=True)
             # hands_detected = gr.Textbox(label="Hands Detected")
-    
+
         submit.click(fn=render_reconstruction, inputs=[input_video, img_focal], outputs=[reconstruction])
 
     with gr.Row():
-        
+
         example_images = gr.Examples([
-            ['./example/video_0.mp4'] 
-            ], 
+            ['./example/video_0.mp4']
+            ],
             inputs=input_video)
-    
+
 demo.launch(debug=True)

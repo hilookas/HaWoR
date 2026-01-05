@@ -43,7 +43,7 @@ if __name__ == '__main__':
     }
     vis_start = 0
     vis_end = pred_trans.shape[1] - 1
-            
+
     # get faces
     faces = get_mano_faces()
     faces_new = np.array([[92, 38, 234],
@@ -92,9 +92,9 @@ if __name__ == '__main__':
     t_w2c_sla_all = -torch.einsum("bij,bj->bi", R_w2c_sla_all, t_c2w_sla_all)
     left_dict['vertices'] = torch.einsum('ij,btnj->btni', R_x, left_dict['vertices'].cpu())
     right_dict['vertices'] = torch.einsum('ij,btnj->btni', R_x, right_dict['vertices'].cpu())
-    
+
     # Here we use aitviewer(https://github.com/eth-ait/aitviewer) for simple visualization.
-    if args.vis_mode == 'world': 
+    if args.vis_mode == 'world':
         output_pth = os.path.join(seq_folder, f"vis_{vis_start}_{vis_end}")
         if not os.path.exists(output_pth):
             os.makedirs(output_pth)

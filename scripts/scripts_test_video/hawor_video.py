@@ -62,7 +62,7 @@ def hawor_motion_estimation(args, start_idx, end_idx, seq_folder):
             print(f'No focal length provided, use default {img_focal}')
             with open(os.path.join(seq_folder, 'est_focal.txt'), 'w') as file:
                 file.write(str(img_focal))
-    
+
     tid = np.array([tr for tr in tracks])
 
     if os.path.exists(f'{seq_folder}/tracks_{start_idx}_{end_idx}/frame_chunks_all.npy'):
@@ -77,9 +77,9 @@ def hawor_motion_estimation(args, start_idx, end_idx, seq_folder):
     for k, idx in enumerate(tid):
         trk = tracks[idx]
 
-        valid = np.array([t['det'] for t in trk])        
+        valid = np.array([t['det'] for t in trk])
         is_right = np.concatenate([t['det_handedness'] for t in trk])[valid]
-        
+
         if is_right.sum() / len(is_right) < 0.5:
             left_trk.extend(trk)
         else:
@@ -93,13 +93,13 @@ def hawor_motion_estimation(args, start_idx, end_idx, seq_folder):
     tid = [0, 1]
 
     img = cv2.imread(imgfiles[0])
-    img_center = [img.shape[1] / 2, img.shape[0] / 2]# w/2, h/2  
+    img_center = [img.shape[1] / 2, img.shape[0] / 2]# w/2, h/2
     H, W = img.shape[:2]
     model_masks = np.zeros((len(imgfiles), H, W))
 
     bin_size = 128
     max_faces_per_bin = 20000
-    renderer = Renderer(img.shape[1], img.shape[0], img_focal, 'cuda', 
+    renderer = Renderer(img.shape[1], img.shape[0], img_focal, 'cuda',
                     bin_size=bin_size, max_faces_per_bin=max_faces_per_bin)
     # get faces
     faces = get_mano_faces()
@@ -140,7 +140,7 @@ def hawor_motion_estimation(args, start_idx, end_idx, seq_folder):
         boxes = boxes[first_non_zero:last_non_zero+1]
         is_right = np.concatenate([t['det_handedness'] for t in trk])[valid]
         frame = np.array([t['frame'] for t in trk])[valid]
-        
+
         if is_right.sum() / len(is_right) < 0.5:
             is_right = np.zeros((len(boxes), 1))
         else:
@@ -159,7 +159,7 @@ def hawor_motion_estimation(args, start_idx, end_idx, seq_folder):
                 do_flip = False
             else:
                 do_flip = True
-                
+
             results = model.inference(img_ck, boxes_ck, img_focal=img_focal, img_center=img_center, do_flip=do_flip)
 
             data_out = {
@@ -198,7 +198,7 @@ def hawor_motion_estimation(args, start_idx, end_idx, seq_folder):
                 outputs = run_mano_left(data_out["init_trans"], data_out["init_root_orient"], data_out["init_hand_pose"], betas=data_out["init_betas"])
             else: # right
                 outputs = run_mano(data_out["init_trans"], data_out["init_root_orient"], data_out["init_hand_pose"], betas=data_out["init_betas"])
-            
+
             vertices = outputs["vertices"][0].cpu()  # (T, N, 3)
             for img_i, _ in enumerate(img_ck):
                 if do_flip:
@@ -211,9 +211,9 @@ def hawor_motion_estimation(args, start_idx, end_idx, seq_folder):
                 verts_color = torch.tensor([0, 0, 255, 255]) / 255
                 vertices_i = vertices[[img_i]]
                 rend, mask = renderer.render_multiple(vertices_i.unsqueeze(0).cuda(), faces, verts_color.unsqueeze(0).cuda(), cameras, lights)
-                
+
                 model_masks[frame_ck[img_i]] += mask
-                
+
     model_masks = model_masks > 0 # bool
     np.save(f'{seq_folder}/tracks_{start_idx}_{end_idx}/model_masks.npy', model_masks)
     joblib.dump(frame_chunks_all, f'{seq_folder}/tracks_{start_idx}_{end_idx}/frame_chunks_all.npy')
@@ -255,10 +255,10 @@ def hawor_infiller(args, start_idx, end_idx, frame_chunks_all):
     pred_rot = torch.zeros(2, len(imgfiles), 3)
     pred_hand_pose = torch.zeros(2, len(imgfiles), 45)
     pred_betas = torch.zeros(2, len(imgfiles), 10)
-    pred_valid = torch.zeros((2, pred_betas.size(1)))    
+    pred_valid = torch.zeros((2, pred_betas.size(1)))
 
     # camera space to world space
-    tid = [0, 1]            
+    tid = [0, 1]
     for k, idx in enumerate(tid):
         frame_chunks = frame_chunks_all[idx]
 
@@ -266,7 +266,7 @@ def hawor_infiller(args, start_idx, end_idx, frame_chunks_all):
             continue
 
         for frame_ck in frame_chunks:
-            print(f"from frame {frame_ck[0]} to {frame_ck[-1]}")                
+            print(f"from frame {frame_ck[0]} to {frame_ck[-1]}")
             pred_path = os.path.join(seq_folder, 'cam_space', str(idx), f"{frame_ck[0]}_{frame_ck[-1]}.json")
             with open(pred_path, "r") as f:
                 pred_dict = json.load(f)
@@ -284,8 +284,8 @@ def hawor_infiller(args, start_idx, end_idx, frame_chunks_all):
             pred_hand_pose[[idx], frame_ck] = data_world["init_hand_pose"].flatten(-2)
             pred_betas[[idx], frame_ck] = data_world["init_betas"]
             pred_valid[[idx], frame_ck] = 1
-            
-        
+
+
     # runing fillingnet for this video
     frame_list = torch.tensor(list(range(pred_trans.size(1))))
     pred_valid = (pred_valid > 0).numpy()
@@ -323,12 +323,12 @@ def hawor_infiller(args, start_idx, end_idx, frame_chunks_all):
                 pad_length = filling_length - T_original
                 last_time_step = filling_input[-1, :, :]
                 padding = last_time_step.unsqueeze(0).repeat(pad_length, 1, 1)
-                filling_input = torch.cat([filling_input, padding], dim=0) 
+                filling_input = torch.cat([filling_input, padding], dim=0)
                 seq_valid_padding = np.ones((2, filling_length - T_original))
-                seq_valid_padding = np.concatenate([seq_valid, seq_valid_padding], axis=1) 
+                seq_valid_padding = np.concatenate([seq_valid, seq_valid_padding], axis=1)
             else:
                 seq_valid_padding = seq_valid
-                
+
 
             T, B, _ = filling_input.shape
 
@@ -364,4 +364,3 @@ def hawor_infiller(args, start_idx, end_idx, frame_chunks_all):
     joblib.dump([pred_trans, pred_rot, pred_hand_pose, pred_betas, pred_valid], save_path)
     return pred_trans, pred_rot, pred_hand_pose, pred_betas, pred_valid
 
-    
